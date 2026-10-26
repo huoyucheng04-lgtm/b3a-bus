@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B3A 實時班次 · 富泰邨 ↔ 深圳灣口岸</title>
+<style>
+  :root{
+    --bg:#0d1117;
+    --card:#161b22;
+    --line:#262d36;
+    --fg:#e6edf3;
+    --muted:#8b949e;
+    --accent:#f5a623;
+    --go:#3fb950;
+    --err:#d1242f;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:radial-gradient(1400px 700px at 50% -10%,#1b2430 0%,var(--bg) 60%);
+    color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang HK","Noto Sans TC",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;justify-content:center;
+    padding:28px 20px 32px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{width:100%;max-width:1040px}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+  .route{
+    background:var(--accent);color:#1a1200;
+    font-weight:800;font-size:26px;letter-spacing:.5px;
+    padding:6px 14px;border-radius:12px;line-height:1.15;
+  }
+  .titles{line-height:1.3}
+  .titles .t1{font-size:17px;font-weight:700}
+  .titles .t2{font-size:12.5px;color:var(--muted);margin-top:2px}
+
+  /* ---------- dashboard grid ---------- */
+  .grid{display:grid;gap:16px;grid-template-columns:1fr}
+  @media (min-width:760px){ .grid{grid-template-columns:1fr 1fr} }
+
+  .panel{
+    background:var(--card);border:1px solid var(--line);border-radius:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .panel-head{
+    padding:14px 18px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;
+  }
+  .tag{
+    font-size:10.5px;font-weight:700;letter-spacing:.08em;
+    padding:3px 8px;border-radius:999px;
+    background:rgba(245,166,35,.14);color:var(--accent);
+    border:1px solid rgba(245,166,35,.3);
+    white-space:nowrap;
+  }
+  .panel-head .names{line-height:1.35;min-width:0}
+  .panel-head .n1{font-size:15.5px;font-weight:700}
+  .panel-head .n2{font-size:11.5px;color:var(--muted);margin-top:1px}
+
+  ul{list-style:none;margin:0;padding:4px 0;flex:1}
+  li{
+    display:flex;align-items:center;gap:14px;
+    padding:14px 18px;border-bottom:1px solid var(--line);
+  }
+  li:last-child{border-bottom:none}
+  .rank{
+    width:18px;flex:0 0 auto;font-size:13px;font-weight:700;color:var(--muted);
+    text-align:center;
+  }
+  .rank.one{color:var(--accent)}
+  .val{
+    font-size:38px;font-weight:800;font-variant-numeric:tabular-nums;
+    line-height:1;flex:0 0 auto;min-width:104px;
+  }
+  .val small{font-size:13px;font-weight:600;color:var(--muted);margin-left:3px}
+  .val.due{color:var(--go);font-size:26px;min-width:104px}
+  .val.soon{color:var(--accent)}
+  .meta{flex:1;text-align:right;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .meta .clock{color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums}
+  .rmk{color:var(--accent);font-weight:600}
+
+  .msg{padding:34px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.6;flex:1;display:flex;flex-direction:column;justify-content:center}
+  .msg .sub{font-size:12px;opacity:.75;margin-top:2px}
+
+  .panel-foot{
+    padding:8px 18px 10px;border-top:1px solid var(--line);
+    font-size:11px;color:var(--muted);
+    display:flex;align-items:center;gap:6px;
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--go);flex:0 0 auto}
+  .dot.stale{background:var(--err)}
+  .dot.loading{background:var(--muted);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+
+  /* ---------- footer ---------- */
+  footer{
+    margin-top:16px;display:flex;justify-content:space-between;align-items:center;
+    font-size:11.5px;color:var(--muted);gap:12px;flex-wrap:wrap;
+  }
+  .bar{height:3px;background:var(--line);border-radius:2px;margin-top:12px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:var(--accent);transition:width .95s linear}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="route">B3A</div>
+    <div class="titles">
+      <div class="t1">城巴 B3A 實時班次</div>
+      <div class="t2">富泰邨(青山公路) ↔ 深圳灣口岸 · 每 30 秒自動更新</div>
+    </div>
+  </header>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="bar"><i id="bar"></i></div>
+
+  <footer>
+    <div>資料來源：DATA.GOV.HK · 城巴 Citybus 實時到站</div>
+    <div id="updated">正在連線…</div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var REFRESH = 30000;   // 30 秒
+  var MAX     = 3;       // 每邊顯示班次數
+
+  // 城巴 B3A：去程 O = 富泰邨 → 深圳灣口岸；回程 I = 深圳灣口岸 → 富泰邨
+  var PANELS = [
+    {
+      dir: "O",
+      stop: "003261",
+      tag: "去程",
+      n1: "富泰邨 → 深圳灣口岸",
+      n2: "青山公路 富泰邨開出"
+    },
+    {
+      dir: "I",
+      stop: "003208",
+      tag: "回程",
+      n1: "深圳灣口岸 → 富泰邨",
+      n2: "深圳灣口岸開出 · 途經富泰邨"
+    }
+  ];
+
+  var grid  = document.getElementById("grid");
+  var bar   = document.getElementById("bar");
+  var updated = document.getElementById("updated");
+
+  function pad(n){ return n < 10 ? "0" + n : "" + n; }
+  function hhmm(d){ return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  function hhmmss(d){ return hhmm(d) + ":" + pad(d.getSeconds()); }
+  function apiFor(p){
+    return "https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/" + p.stop + "/B3A";
+  }
+
+  // ---------- build panel DOM ----------
+  PANELS.forEach(function (p) {
+    p.etas = [];
+    p.ok = null;
+
+    var panel = document.createElement("section");
+    panel.className = "panel";
+    panel.innerHTML =
+      '<div class="panel-head">' +
+        '<span class="tag">' + p.tag + '</span>' +
+        '<span class="names"><span class="n1">' + p.n1 + '</span>' +
+        '<div class="n2">' + p.n2 + '</div></span>' +
+      '</div>' +
+      '<ul></ul>' +
+      '<div class="panel-foot"><span class="dot loading"></span><span class="ft"></span></div>';
+
+    p.el     = panel;
+    p.list   = panel.querySelector("ul");
+    p.dot    = panel.querySelector(".dot");
+    p.ft     = panel.querySelector(".ft");
+    grid.appendChild(panel);
+
+    p.list.innerHTML = '<li><span class="rank"></span>' +
+      '<span class="val" style="color:var(--muted)">…</span>' +
+      '<span class="meta">載入中</span></li>';
+    p.ft.textContent = "正在連線…";
+  });
+
+  // ---------- render ----------
+  function renderPanel(p) {
+    var now = Date.now();
+    var upcoming = p.etas.filter(function (e) { return e.at.getTime() - now > -60000; });
+
+    if (!upcoming.length) {
+      p.list.innerHTML = '<li class="msg">暫時沒有預定班次' +
+        '<div class="sub">No upcoming departure</div></li>';
+      return;
+    }
+
+    var html = "";
+    upcoming.slice(0, MAX).forEach(function (e, i) {
+      var m = Math.round((e.at.getTime() - now) / 60000);
+      var cls = "val", val, unit = "<small>分鐘</small>";
+
+      if (m <= 0) {
+        cls += " due";
+        val = "即將到站";
+        unit = "";
+      } else {
+        if (m <= 5) cls += " soon";
+        val = String(m);
+      }
+
+      html += '<li>' +
+        '<span class="rank' + (i === 0 ? " one" : "") + '">' + (i + 1) + '</span>' +
+        '<span class="' + cls + '">' + val + unit + '</span>' +
+        '<span class="meta">' +
+          '<span class="clock">' + hhmm(e.at) + '</span>' +
+          (e.rmk ? '<div class="rmk">' + e.rmk + '</div>' : '') +
+        '</span>' +
+      '</li>';
+    });
+
+    p.list.innerHTML = html;
+  }
+
+  function renderAll(){ PANELS.forEach(renderPanel); }
+
+  // ---------- fetch ----------
+  function fetchPanel(p) {
+    return fetch(apiFor(p), { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (json) {
+        var rows = (json && json.data) || [];
+        p.etas = rows
+          .filter(function (r) { return r.dir === p.dir && r.eta; })
+          .map(function (r) {
+            return { at: new Date(r.eta), rmk: r.rmk_tc || r.rmk_en || "" };
+          })
+          .filter(function (e) { return !isNaN(e.at.getTime()); })
+          .sort(function (a, b) { return a.at - b.at; });
+
+        p.ok = true;
+        p.dot.className = "dot";
+        p.ft.textContent = "已更新 " + hhmmss(new Date());
+        renderPanel(p);
+      })
+      .catch(function (err) {
+        p.ok = false;
+        p.dot.className = "dot stale";
+        p.ft.textContent = p.etas.length ? "連線失敗 · 顯示上次資料" : "無法取得資料";
+        console.error("B3A ETA error (" + p.n1 + "):", err);
+      });
+  }
+
+  function refresh() {
+    var t = new Date();
+    updated.textContent = "最後更新 " + hhmmss(t);
+    return Promise.all(PANELS.map(fetchPanel));
+  }
+
+  // ---------- loops ----------
+  refresh();
+  setInterval(refresh, REFRESH);
+  setInterval(renderAll, 1000);   // 每秒更新倒數分鐘
+
+  // 進度條 = 距離下次更新
+  (function animateBar(){
+    var start = Date.now();
+    setInterval(function () {
+      bar.style.width = (((Date.now() - start) % REFRESH) / REFRESH * 100) + "%";
+    }, 1000);
+  })();
+})();
+</script>
+</body>
+</html>
